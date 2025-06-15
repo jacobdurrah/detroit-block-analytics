@@ -43,6 +43,31 @@ detroit-block-analytics/
 - Node.js 18+
 - Supabase account
 - Access to Detroit property data APIs
+- Vercel account (for API deployment)
+
+## API Deployment
+
+This project includes REST API endpoints that can be deployed to Vercel:
+
+### Deploy to Vercel
+
+1. Install Vercel CLI: `npm i -g vercel`
+2. Run `vercel` in the project directory
+3. Follow the prompts to link to your Vercel account
+4. Set environment variables in Vercel dashboard:
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_KEY`
+
+### API Endpoints
+
+See [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) for complete API documentation.
+
+Key endpoints:
+- `GET /api/blocks` - List all blocks
+- `GET /api/blocks/[blockId]` - Get block details
+- `GET /api/analytics/summary` - Get analytics summary
+- `GET /api/search?q=query` - Search blocks and parcels
 
 ## License
 
