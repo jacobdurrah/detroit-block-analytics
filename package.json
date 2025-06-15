@@ -14,7 +14,6 @@
   "keywords": ["detroit", "property", "analytics", "gis", "blocks"],
   "author": "",
   "license": "MIT",
-  "type": "module",
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
     "@turf/turf": "^6.5.0",

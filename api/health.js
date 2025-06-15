@@ -1,56 +1,59 @@
-import { getSupabaseClient, apiResponse, errorResponse, handleOptions } from './_utils.js';
+export const config = {
+  runtime: 'edge',
+};
 
-/**
- * GET /api/health
- * Health check endpoint
- */
 export default async function handler(request) {
+  // Handle CORS preflight
   if (request.method === 'OPTIONS') {
-    return handleOptions();
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      }
+    });
   }
 
   if (request.method !== 'GET') {
-    return errorResponse('Method not allowed', 405);
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      }
+    });
   }
 
   try {
-    const supabase = getSupabaseClient();
-    
-    // Test database connection
-    const { count: blockCount, error: blockError } = await supabase
-      .from('blocks')
-      .select('*', { count: 'exact', head: true });
-    
-    const { data: lastRun, error: runError } = await supabase
-      .from('analytics_runs')
-      .select('*')
-      .order('started_at', { ascending: false })
-      .limit(1)
-      .single();
-    
-    const healthy = !blockError && !runError;
-    
-    return apiResponse({
-      status: healthy ? 'healthy' : 'unhealthy',
+    // For now, just return a simple health check
+    // We'll add database check after confirming basic functionality
+    const health = {
+      status: 'healthy',
       timestamp: new Date().toISOString(),
-      database: {
-        connected: !blockError,
-        blockCount: blockCount || 0
-      },
-      lastAnalyticsRun: lastRun ? {
-        id: lastRun.id,
-        type: lastRun.run_type,
-        status: lastRun.status,
-        startedAt: lastRun.started_at,
-        completedAt: lastRun.completed_at
-      } : null,
       environment: {
         hasSupabaseUrl: !!process.env.SUPABASE_URL,
         hasSupabaseKey: !!process.env.SUPABASE_SERVICE_KEY
       }
-    }, healthy ? 200 : 503);
+    };
+
+    return new Response(JSON.stringify(health), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      }
+    });
   } catch (error) {
-    console.error('Health check error:', error);
-    return errorResponse('Health check failed', 503);
+    return new Response(JSON.stringify({ 
+      error: 'Health check failed',
+      message: error.message 
+    }), {
+      status: 503,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      }
+    });
   }
 }
