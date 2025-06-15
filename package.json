@@ -1,0 +1,31 @@
+{
+  "name": "detroit-block-analytics",
+  "version": "1.0.0",
+  "description": "A comprehensive system for analyzing Detroit property data at the block level, where blocks are defined as street segments between cross streets.",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "dev": "node scripts/dev.js",
+    "analytics:full": "node scripts/process-block-analytics.js --full",
+    "analytics:incremental": "node scripts/process-block-analytics.js",
+    "migrate": "node database/migrate.js",
+    "api": "node api/server.js"
+  },
+  "keywords": ["detroit", "property", "analytics", "gis", "blocks"],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "@turf/turf": "^6.5.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2",
+    "p-limit": "^5.0.0",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.2"
+  }
+}
