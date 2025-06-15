@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detroit Block Visualizer</title>
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 70%;
+        }
+        #sidebar {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 30%;
+            height: 100%;
+            background: white;
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
+            box-shadow: -2px 0 4px rgba(0,0,0,0.1);
+        }
+        .block-info {
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .block-info.selected {
+            border-color: #0078d4;
+            background-color: #f0f8ff;
+        }
+        .stats {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        #file-input {
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+        }
+        #test-button {
+            margin: 10px 0;
+            padding: 10px 20px;
+            background: #0078d4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #test-button:hover {
+            background: #106ebe;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="sidebar">
+        <h2>Block Visualizer</h2>
+        
+        <div id="file-input">
+            <label>Load CSV file:</label>
+            <input type="file" id="csv-file" accept=".csv">
+            <br><br>
+            <button id="test-button">Load Test Data</button>
+        </div>
+        
+        <div id="stats-summary">
+            <h3>Summary</h3>
+            <div class="stats">
+                <div>Total Parcels: <span id="total-parcels">0</span></div>
+                <div>Unique Blocks: <span id="unique-blocks">0</span></div>
+                <div>Parse Errors: <span id="parse-errors">0</span></div>
+            </div>
+        </div>
+        
+        <h3>Blocks</h3>
+        <div id="block-list"></div>
+    </div>
+    
+    <div class="legend">
+        <h4>Block Colors</h4>
+        <div id="legend-items"></div>
+    </div>
+
+    <script type="module">
+        // Import block detector functions
+        const blockDetector = {
+            parseAddress: (address) => {
+                if (!address) return null;
+                const cleaned = address.trim().toUpperCase();
+                const regex = /^(\d+)(?:-\d+)?\s+(?:(N|S|E|W)\s+)?(.+?)\s+(ST|STREET|AVE|AVENUE|RD|ROAD|BLVD|BOULEVARD|DR|DRIVE)\.?$/i;
+                const match = cleaned.match(regex);
+                
+                if (!match) {
+                    const simpleMatch = cleaned.match(/^(\d+)\s+(.+)$/);
+                    if (simpleMatch) {
+                        return {
+                            houseNumber: parseInt(simpleMatch[1]),
+                            streetName: simpleMatch[2].toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
+                            fullStreet: simpleMatch[2]
+                        };
+                    }
+                    return null;
+                }
+                
+                const [, houseNumber, directional, streetName, streetType] = match;
+                const normalizedStreet = ((directional || '') + ' ' + streetName).trim()
+                    .toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+                
+                return {
+                    houseNumber: parseInt(houseNumber),
+                    streetName: normalizedStreet,
+                    fullStreet: ((directional ? directional + ' ' : '') + streetName + ' ' + streetType)
+                };
+            },
+            
+            generateBlockId: (parsed, blockSize = 100) => {
+                if (!parsed || !parsed.houseNumber) return null;
+                const blockStart = Math.floor(parsed.houseNumber / blockSize) * blockSize;
+                const blockEnd = blockStart + blockSize - 1;
+                return `${parsed.streetName}_${blockStart}_${blockEnd}`;
+            }
+        };
+
+        // Test data for demonstration
+        const testData = [
+            // Woodward Ave blocks
+            { parcel_id: "001", address: "1201 Woodward Ave", lat: 42.3354, lng: -83.0455 },
+            { parcel_id: "002", address: "1215 Woodward Ave", lat: 42.3356, lng: -83.0456 },
+            { parcel_id: "003", address: "1235 Woodward Ave", lat: 42.3358, lng: -83.0457 },
+            { parcel_id: "004", address: "1255 Woodward Ave", lat: 42.3360, lng: -83.0458 },
+            { parcel_id: "005", address: "1301 Woodward Ave", lat: 42.3364, lng: -83.0459 },
+            { parcel_id: "006", address: "1315 Woodward Ave", lat: 42.3366, lng: -83.0460 },
+            
+            // Jefferson Ave blocks
+            { parcel_id: "007", address: "500 E Jefferson Ave", lat: 42.3280, lng: -83.0400 },
+            { parcel_id: "008", address: "520 E Jefferson Ave", lat: 42.3280, lng: -83.0390 },
+            { parcel_id: "009", address: "540 E Jefferson Ave", lat: 42.3280, lng: -83.0380 },
+            { parcel_id: "010", address: "600 E Jefferson Ave", lat: 42.3280, lng: -83.0370 },
+            
+            // 7 Mile Rd
+            { parcel_id: "011", address: "15000 7 Mile Rd", lat: 42.4320, lng: -83.1500 },
+            { parcel_id: "012", address: "15020 7 Mile Rd", lat: 42.4320, lng: -83.1490 },
+            { parcel_id: "013", address: "15040 7 Mile Rd", lat: 42.4320, lng: -83.1480 },
+        ];
+
+        // Initialize map
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: {
+                version: 8,
+                sources: {
+                    osm: {
+                        type: 'raster',
+                        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                        tileSize: 256,
+                        attribution: '© OpenStreetMap contributors'
+                    }
+                },
+                layers: [{
+                    id: 'osm',
+                    type: 'raster',
+                    source: 'osm'
+                }]
+            },
+            center: [-83.0458, 42.3314], // Detroit
+            zoom: 13
+        });
+
+        // Color palette for blocks
+        const colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57',
+            '#6C5CE7', '#A29BFE', '#FD79A8', '#FDCB6E', '#6C5CE7',
+            '#00B894', '#00CEC9', '#0984E3', '#6C5CE7', '#EB3B5A'
+        ];
+
+        let blockColorMap = {};
+        let currentData = [];
+
+        function assignBlockIds(parcels) {
+            const results = [];
+            const blockStats = new Map();
+            
+            for (const parcel of parcels) {
+                const parsed = blockDetector.parseAddress(parcel.address);
+                
+                if (!parsed) {
+                    results.push({ ...parcel, block_id: null, parse_error: true });
+                    continue;
+                }
+                
+                const blockId = blockDetector.generateBlockId(parsed);
+                results.push({ ...parcel, block_id: blockId, parsed });
+                
+                if (!blockStats.has(blockId)) {
+                    blockStats.set(blockId, {
+                        count: 0,
+                        parcels: [],
+                        streetName: parsed.fullStreet
+                    });
+                }
+                
+                blockStats.get(blockId).count++;
+                blockStats.get(blockId).parcels.push(parcel);
+            }
+            
+            return { parcels: results, blockStats };
+        }
+
+        function visualizeData(data) {
+            currentData = data;
+            const { parcels, blockStats } = assignBlockIds(data);
+            
+            // Update stats
+            document.getElementById('total-parcels').textContent = parcels.length;
+            document.getElementById('unique-blocks').textContent = blockStats.size;
+            document.getElementById('parse-errors').textContent = parcels.filter(p => p.parse_error).length;
+            
+            // Assign colors to blocks
+            blockColorMap = {};
+            let colorIndex = 0;
+            for (const blockId of blockStats.keys()) {
+                blockColorMap[blockId] = colors[colorIndex % colors.length];
+                colorIndex++;
+            }
+            
+            // Add parcels to map
+            const features = parcels
+                .filter(p => p.block_id && p.lat && p.lng)
+                .map(p => ({
+                    type: 'Feature',
+                    properties: {
+                        ...p,
+                        color: blockColorMap[p.block_id]
+                    },
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [p.lng, p.lat]
+                    }
+                }));
+            
+            // Remove existing layer if any
+            if (map.getSource('parcels')) {
+                map.removeLayer('parcels');
+                map.removeSource('parcels');
+            }
+            
+            // Add new data
+            map.addSource('parcels', {
+                type: 'geojson',
+                data: {
+                    type: 'FeatureCollection',
+                    features
+                }
+            });
+            
+            map.addLayer({
+                id: 'parcels',
+                type: 'circle',
+                source: 'parcels',
+                paint: {
+                    'circle-radius': 8,
+                    'circle-color': ['get', 'color'],
+                    'circle-stroke-color': '#fff',
+                    'circle-stroke-width': 2
+                }
+            });
+            
+            // Update sidebar
+            const blockList = document.getElementById('block-list');
+            blockList.innerHTML = '';
+            
+            for (const [blockId, stats] of blockStats) {
+                const blockDiv = document.createElement('div');
+                blockDiv.className = 'block-info';
+                blockDiv.innerHTML = `
+                    <strong>${blockId}</strong>
+                    <div class="stats">
+                        Street: ${stats.streetName}<br>
+                        Parcels: ${stats.count}
+                    </div>
+                `;
+                
+                blockDiv.style.borderLeftColor = blockColorMap[blockId];
+                blockDiv.style.borderLeftWidth = '4px';
+                
+                blockDiv.addEventListener('click', () => {
+                    // Zoom to block
+                    const blockParcels = parcels.filter(p => p.block_id === blockId && p.lat && p.lng);
+                    if (blockParcels.length > 0) {
+                        const bounds = blockParcels.reduce((bounds, p) => {
+                            return bounds.extend([p.lng, p.lat]);
+                        }, new maplibregl.LngLatBounds());
+                        
+                        map.fitBounds(bounds, { padding: 50 });
+                    }
+                });
+                
+                blockList.appendChild(blockDiv);
+            }
+            
+            // Update legend
+            const legendItems = document.getElementById('legend-items');
+            legendItems.innerHTML = '';
+            let legendCount = 0;
+            
+            for (const [blockId, color] of Object.entries(blockColorMap)) {
+                if (legendCount >= 5) {
+                    const moreDiv = document.createElement('div');
+                    moreDiv.className = 'legend-item';
+                    moreDiv.innerHTML = `<em>...and ${Object.keys(blockColorMap).length - 5} more blocks</em>`;
+                    legendItems.appendChild(moreDiv);
+                    break;
+                }
+                
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'legend-item';
+                itemDiv.innerHTML = `
+                    <div class="legend-color" style="background-color: ${color}"></div>
+                    <span>${blockId}</span>
+                `;
+                legendItems.appendChild(itemDiv);
+                legendCount++;
+            }
+            
+            // Fit map to data
+            if (features.length > 0) {
+                const bounds = features.reduce((bounds, f) => {
+                    return bounds.extend(f.geometry.coordinates);
+                }, new maplibregl.LngLatBounds());
+                
+                map.fitBounds(bounds, { padding: 50 });
+            }
+        }
+
+        // Handle test data button
+        document.getElementById('test-button').addEventListener('click', () => {
+            visualizeData(testData);
+        });
+
+        // Handle CSV file upload
+        document.getElementById('csv-file').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const text = e.target.result;
+                const lines = text.split('\n');
+                const headers = lines[0].split(',').map(h => h.trim());
+                
+                const data = [];
+                for (let i = 1; i < lines.length; i++) {
+                    if (!lines[i].trim()) continue;
+                    
+                    const values = lines[i].split(',');
+                    const row = {};
+                    headers.forEach((header, j) => {
+                        row[header] = values[j]?.trim();
+                    });
+                    
+                    // Convert lat/lng to numbers
+                    if (row.lat) row.lat = parseFloat(row.lat);
+                    if (row.lng) row.lng = parseFloat(row.lng);
+                    if (row.latitude) row.lat = parseFloat(row.latitude);
+                    if (row.longitude) row.lng = parseFloat(row.longitude);
+                    
+                    data.push(row);
+                }
+                
+                visualizeData(data);
+            };
+            
+            reader.readAsText(file);
+        });
+
+        // Add click handler for parcels
+        map.on('click', 'parcels', (e) => {
+            const properties = e.features[0].properties;
+            new maplibregl.Popup()
+                .setLngLat(e.lngLat)
+                .setHTML(`
+                    <strong>${properties.address}</strong><br>
+                    Block: ${properties.block_id}<br>
+                    Parcel ID: ${properties.parcel_id}
+                `)
+                .addTo(map);
+        });
+
+        // Change cursor on hover
+        map.on('mouseenter', 'parcels', () => {
+            map.getCanvas().style.cursor = 'pointer';
+        });
+        
+        map.on('mouseleave', 'parcels', () => {
+            map.getCanvas().style.cursor = '';
+        });
+    </script>
+</body>
+</html>
