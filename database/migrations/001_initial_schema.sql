@@ -123,7 +123,7 @@ SELECT
     ba.total_parcels,
     ba.vacant_parcels,
     ba.vacant_buildings,
-    ROUND((ba.vacant_parcels::FLOAT / NULLIF(ba.total_parcels, 0) * 100), 2) as vacancy_rate,
+    ROUND((ba.vacant_parcels::FLOAT / NULLIF(ba.total_parcels, 0) * 100)::NUMERIC, 2) as vacancy_rate,
     ba.avg_assessed_value,
     ba.recent_sales_count,
     ba.tax_delinquent_percentage,
