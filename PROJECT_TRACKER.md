@@ -8,19 +8,27 @@ Create a system that analyzes Detroit property data at the block level (street s
 ### Phase 1: Project Setup ✅
 - [x] Create GitHub repository structure
 - [x] Initialize project documentation
-- [ ] Set up npm project
-- [ ] Create .gitignore
-- [ ] Set up environment configuration
+- [x] Set up npm project
+- [x] Create .gitignore
+- [x] Set up environment configuration
 
-### Phase 2: Database Design 🚧
-- [ ] Design Supabase schema
-- [ ] Create SQL migrations
-  - [ ] blocks table
-  - [ ] block_analytics table
-  - [ ] block_parcels table
-  - [ ] analytics_runs table
-- [ ] Set up database indexes
+### Phase 2: Database Design ✅
+- [x] Design Supabase schema
+- [x] Create SQL migrations
+  - [x] blocks table
+  - [x] block_analytics table
+  - [x] block_parcels table
+  - [x] analytics_runs table
+- [x] Set up database indexes
+- [x] Create views for easy querying
 - [ ] Create initial seed data
+
+### Phase 3: Core Libraries 🚧
+- [x] Create Supabase client library
+- [ ] Create Detroit API client
+- [ ] Implement block detection algorithm
+- [ ] Create data transformation utilities
+- [ ] Set up logging system
 
 ### Phase 3: Core Libraries 📋
 - [ ] Create Supabase client library
