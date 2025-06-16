@@ -12,7 +12,9 @@
     "analytics:incremental": "node scripts/process-block-analytics.js",
     "migrate": "node database/migrate.js",
     "api": "node api/server.js",
-    "visualize": "open tools/block-visualizer.html"
+    "visualize": "open tools/block-visualizer.html",
+    "analyze:sales": "node scripts/analyze-sales-data.js",
+    "process:sales": "node scripts/process-sales-data.js"
   },
   "keywords": [
     "detroit",
